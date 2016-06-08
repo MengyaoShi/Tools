@@ -180,11 +180,14 @@ class Common {
   static std::vector<reco::MuonRef> getSoftRecoMuons(const edm::Handle<reco::MuonCollection>&, 
 						     const reco::Vertex*, const double);
 
+  static std::vector<reco::MuonRef> getTrackerRecoMuons(const edm::Handle<reco::MuonCollection>&);
   /*fill STL container with muons passing the 2012 soft selection and |eta|
     (cf. https://twiki.cern.ch/twiki/bin/view/CMSPublic/SWGuideMuonId)*/
   static std::vector<reco::MuonRef> getSoftRecoMuons(const edm::Handle<reco::MuonRefVector>&, 
 						     const edm::Handle<reco::MuonCollection>&, 
 						     const reco::Vertex*, const double);
+  static std::vector<reco::MuonRef> getTrackerRecoMuons(const edm::Handle<reco::MuonRefVector>&,
+                                                        const edm::Handle<reco::MuonCollection>&);
 
   /*fill STL container with muons passing the 2012 soft selection and |eta| along with dz < 0.5 cm
     (cf. https://twiki.cern.ch/twiki/bin/view/CMSPublic/SWGuideMuonId)*/

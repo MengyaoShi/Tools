@@ -83,6 +83,7 @@ private:
   //input tag for overlap candidate collection
   edm::EDGetTokenT<edm::RefVector<std::vector<T> > > overlapCandTag_;
 
+  edm::EDGetTokenT<edm::RefVector<std::vector<T> > > overlapCandTag1_;
   //vector of input tags, 1 for each discriminator the tau should pass
   //std::vector<edm::EDGetTokenT<reco::PFTauDiscriminator> > tauDiscriminatorTags_;
   //std::vector<edm::InputTag> tauDiscriminatorTags_;
@@ -107,9 +108,6 @@ private:
   //minimum number of objects that must be found to pass the filter
   unsigned int minNumObjsToPassFilter_;
   //  std::map<std::string, TH1D*> histos1D_;
-  TH1F *TestDRValMap_;
-  TH1F *TestDR_;
-  TH1F *TauMuBranchingRatio_;
   TH1F *TauPt_;
   TH1F *NPassing_;
 
@@ -140,6 +138,8 @@ CustomTauSelector<T>::CustomTauSelector(const edm::ParameterSet& iConfig) :
 			  edm::EDGetTokenT<edm::ValueMap<bool> >()),
   overlapCandTag_(iConfig.existsAs<edm::InputTag>("overlapCandTag") ? 
 		  consumes<edm::RefVector<std::vector<T> > >(iConfig.getParameter<edm::InputTag>("overlapCandTag")) : edm::EDGetTokenT<edm::RefVector<std::vector<T> > >()),
+  overlapCandTag1_(iConfig.existsAs<edm::InputTag>("overlapCandTag1") ?
+                  consumes<edm::RefVector<std::vector<T> > >(iConfig.getParameter<edm::InputTag>("overlapCandTag1")) : edm::EDGetTokenT<edm::RefVector<std::vector<T> > >()),
 //  tauDiscriminatorTags_(consumes<std::vector<edm::EDGetTokenT<reco::PFTauDiscriminator> > >(iConfig.getParameter<std::vector<edm::InputTag> >("tauDiscriminatorTags"))),
 //  tauDiscriminatorTags_(iConfig.getParameter<std::vector<edm::InputTag> >("tauDiscriminatorTags")),
   passDiscriminator_(iConfig.getParameter<bool>("passDiscriminator")),
@@ -163,11 +163,6 @@ CustomTauSelector<T>::CustomTauSelector(const edm::ParameterSet& iConfig) :
     std::cerr << "Warning: only one of jetTag or muonRemovalDecisionTag was supplied.  No ";
     std::cerr << "decision on tau seed jet will be made.\n";
   }
-  if ((overlapCandTag_.isUninitialized()) && !(jetTag_.isUninitialized()) && 
-      !(muonRemovalDecisionTag_.isUninitialized())) {
-    std::cerr << "Warning: both jetTag and muonRemovalDecisionTag were supplied, but not ";
-    std::cerr << "overlapCandTag.  Overlap with overlap candidates will not be checked.\n";
-  }
   produces<reco::PFTauRefVector>();
 }
 
@@ -189,7 +184,6 @@ CustomTauSelector<T>::~CustomTauSelector()
 template<class T>
 bool CustomTauSelector<T>::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
 {
-std::cout << "<---------------------In CustomTauSelector-------------------->" << std::endl;
   //create pointer to output collection
   std::auto_ptr<reco::PFTauRefVector> tauColl(new reco::PFTauRefVector);
 
@@ -231,6 +225,10 @@ std::cout << "<---------------------In CustomTauSelector-------------------->" <
   if (overlapCandTag_.isUninitialized()) {}
   else iEvent.getByToken(overlapCandTag_, pOverlapCands);
 
+  edm::Handle<edm::RefVector<std::vector<T> > > pOverlapCands1;
+  if (overlapCandTag1_.isUninitialized()) {}
+  else iEvent.getByToken(overlapCandTag1_, pOverlapCands1);
+
   //fill STL container of pointers to overlap candidates
   std::vector<T*> overlapCandPtrs;
   if (pOverlapCands.isValid()) 
@@ -238,7 +236,12 @@ std::cout << "<---------------------In CustomTauSelector-------------------->" <
     for (typename edm::RefVector<std::vector<T> >::const_iterator iOverlapCand = pOverlapCands->begin(); iOverlapCand != pOverlapCands->end(); ++iOverlapCand) 
       overlapCandPtrs.push_back(const_cast<T*>(iOverlapCand->get())); 
   }
-
+  std::vector<T*> overlapCandPtrs1;
+  if (pOverlapCands1.isValid())
+  {
+    for (typename edm::RefVector<std::vector<T> >::const_iterator iOverlapCand1 = pOverlapCands1->begin(); iOverlapCand1 != pOverlapCands1->end(); ++iOverlapCand1)
+      overlapCandPtrs1.push_back(const_cast<T*>(iOverlapCand1->get()));
+  }
   //fill STL container with taus passing specified discriminators in specified eta and pT range
   std::vector<reco::PFTauRef> taus = pTaus.isValid() ? 
     Common::getRecoTaus(pTaus, pBaseTaus, pTauDiscriminators, pTauHadIso, pTMin_, etaMax_, passDiscriminator_, isoMax_) : 
@@ -252,21 +255,13 @@ std::cout << "<---------------------In CustomTauSelector-------------------->" <
     {
       //find the nearest overlap candidate to the tau
       int nearestMuonIndex = -1;
+      int nearestMuonIndex1 = -1;
       const reco::Candidate* nearestMuon = Common::nearestObject(*iTau, overlapCandPtrs, nearestMuonIndex);
-      if( (*pMuonRemovalDecisions)[(*iTau)->jetRef()]&& pOverlapCands.isValid())
-      {
-        TestDRValMap_->Fill(reco::deltaR(**iTau, *nearestMuon));
-        std::cout<<"nearestMuon!=NULL is true or not=="<<(nearestMuon!=NULL)<<std::endl;
-      }
+ const reco::Candidate* nearestMuon1 = Common::nearestObject(*iTau, overlapCandPtrs1, nearestMuonIndex1);
    
       //if tau doesn't overlap with overlap candidate (or no overlap checking requested)...
-      if(pOverlapCands.isValid())   {
-        TestDR_->Fill(reco::deltaR(**iTau,*nearestMuon));
-        std::cout<<"nearestMuon!=NULL is true or not=="<<(nearestMuon!=NULL)<<std::endl;
-        std::cout<<"(reco::deltaR(**iTau, *nearestMuon) > dR_)=="<<(reco::deltaR(**iTau, *nearestMuon) > dR_)<<std::endl;
-      }
      
-      if (!(pOverlapCands.isValid()) || ((nearestMuon != NULL) && (reco::deltaR(**iTau, *nearestMuon) > dR_))) 
+      if ((!(pOverlapCands.isValid()) || ((nearestMuon != NULL) && (reco::deltaR(**iTau, *nearestMuon) > dR_)))&&(!(pOverlapCands1.isValid()) || ((nearestMuon1 != NULL) && (reco::deltaR(**iTau, *nearestMuon1) > dR_)))) 
       {
         /*...if jet collection and muon removal decision map exist, fill output collection if tau is 
   	matched to jet tagged for muon removal*/
@@ -295,7 +290,6 @@ std::cout << "<---------------------In CustomTauSelector-------------------->" <
         std::cout<<"pJets.isValid()"<<pJets.isValid()<<std::endl;
         std::cout<<"pMuonRemovalDecisions.isValid()"<<pMuonRemovalDecisions.isValid()<<std::endl;
         std::cout<<"nPassingTaus"<<nPassingTaus<<std::endl;*/
-        TauMuBranchingRatio_->Fill((*pMuonRemovalDecisions)[(*iTau)->jetRef()]);
       }
     }//if iTaucharge
   }
@@ -317,9 +311,6 @@ void CustomTauSelector<T>::beginJob()
 //histos1D_["TauPt"]=fileService->make<TH1D>("TauPt", "TauPt",100,0,300);
 //histos1D_["nPassing"]=fileService->make<TH1D>("nPassing","nPassing",2,0,2);
 out_ = new TFile(outFileName_.c_str(), "RECREATE");
-TestDRValMap_ = new TH1F("TestDRValMap", ";dR valMap;", 23, 0, 7.0);
-TestDR_ = new TH1F("TestDR", ";dR;", 23, 0, 7.0);
-TauMuBranchingRatio_ = new TH1F("tau_mu branching ratio", "tau_mu branching rattio",2,0,2);
 TauPt_ = new TH1F("TauPt", "TauPt",100,0,300);
 NPassing_ = new TH1F("nPassing","nPassing",2,0,2);
 
@@ -330,21 +321,12 @@ template<class T>
 void CustomTauSelector<T>::endJob() {
   out_->cd();
 
-  TCanvas TestDRValMapCanvas_("TestDRValMapCanvas","",600,600);
-  TCanvas TestDRCanvas_("TestDRCanvas","",600,600);
-  TCanvas TauMuBranchingRatioCanvas_("TauMuBranchingRatioCanvas","",600,600);
   TCanvas TauPtCanvas_("TauPtCanvas","",600,600);
   TCanvas NPassingCanvas_("NPassingCanvas","",600,600);
 
-  Common::draw1DHistograms(TestDRValMapCanvas_, TestDRValMap_);
-  Common::draw1DHistograms(TestDRCanvas_, TestDR_);
-  Common::draw1DHistograms(TauMuBranchingRatioCanvas_, TauMuBranchingRatio_);
   Common::draw1DHistograms(TauPtCanvas_, TauPt_);
   Common::draw1DHistograms(NPassingCanvas_, NPassing_);
 
-  TestDRValMapCanvas_.Write();
-  TestDRCanvas_.Write();
-  TauMuBranchingRatioCanvas_.Write();
   TauPtCanvas_.Write();
   NPassingCanvas_.Write();
 

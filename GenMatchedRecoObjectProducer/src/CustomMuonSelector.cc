@@ -68,7 +68,7 @@ private:
 
   //input tag for muons that should not be allowed to pass (i.e. they passed some other selection)
   edm::EDGetTokenT<reco::MuonRefVector> vetoMuonTag_;
-
+  edm::EDGetTokenT<reco::MuonRefVector> vetoMuonTag2_;
   //muon ID to apply
   std::string muonID_;
 
@@ -109,7 +109,10 @@ CustomMuonSelector::CustomMuonSelector(const edm::ParameterSet& iConfig) :
   baseMuonTag_(consumes<reco::MuonCollection>(iConfig.getParameter<edm::InputTag>("baseMuonTag"))),
   muonTag_(consumes<reco::MuonRefVector>(iConfig.getParameter<edm::InputTag>("muonTag"))),
   vtxTag_(consumes<reco::VertexCollection>(iConfig.getParameter<edm::InputTag>("vtxTag"))),
-  vetoMuonTag_(consumes<reco::MuonRefVector>(iConfig.getParameter<edm::InputTag>("vetoMuonTag"))),
+  vetoMuonTag_(iConfig.existsAs<edm::InputTag>("vetoMuonTag")?
+                  consumes<reco::MuonRefVector>(iConfig.getParameter<edm::InputTag>("vetoMuonTag")):edm::EDGetTokenT<reco::MuonRefVector>()),
+  vetoMuonTag2_(iConfig.existsAs<edm::InputTag>("vetoMuonTag2")?
+                  consumes<reco::MuonRefVector>(iConfig.getParameter<edm::InputTag>("vetoMuonTag2")):edm::EDGetTokenT<reco::MuonRefVector>()),
   muonID_(iConfig.getParameter<std::string>("muonID")),
   PFIsoMax_(iConfig.getParameter<double>("PFIsoMax")),
   detectorIsoMax_(iConfig.getParameter<double>("detectorIsoMax")),
@@ -156,7 +159,12 @@ bool CustomMuonSelector::filter(edm::Event& iEvent, const edm::EventSetup& iSetu
 
   //get veto muons
   edm::Handle<reco::MuonRefVector> pVetoMuons;
-  iEvent.getByToken(vetoMuonTag_, pVetoMuons);
+  if(vetoMuonTag_.isUninitialized()){}
+  else iEvent.getByToken(vetoMuonTag_, pVetoMuons);
+
+  edm::Handle<reco::MuonRefVector> pVetoMuons2;
+  if(vetoMuonTag2_.isUninitialized()){}
+  else iEvent.getByToken(vetoMuonTag2_, pVetoMuons2);
 
   //identify the first good vertex (the "primary" (?))
   reco::Vertex* pPV = Common::getPrimaryVertex(pVertices);
@@ -193,7 +201,12 @@ bool CustomMuonSelector::filter(edm::Event& iEvent, const edm::EventSetup& iSetu
       Common::getSoftRecoMuons(pMuons, pBaseMuons, pPV, etaMax_) : 
       Common::getSoftRecoMuons(pBaseMuons, pPV, etaMax_);
   }
-
+  
+  else if (muonID_ == "tracker"){
+     muons =pMuons.isValid() ?
+       Common::getTrackerRecoMuons(pMuons, pBaseMuons):
+       Common::getTrackerRecoMuons(pBaseMuons);
+  }
   //error: unsupported muon ID
   else throw cms::Exception("CustomMuonSelector") << "Error: unsupported muon ID.\n";
 
@@ -205,13 +218,19 @@ bool CustomMuonSelector::filter(edm::Event& iEvent, const edm::EventSetup& iSetu
       vetoMuonRefKeys.push_back(iVetoMuon->key());
     }
   }
-
+  std::vector<int> vetoMuonRefKeys2;
+  if (pVetoMuons2.isValid()) {
+    for (reco::MuonRefVector::const_iterator iVetoMuon2 = pVetoMuons2->begin();
+         iVetoMuon2 != pVetoMuons2->end(); ++iVetoMuon2) {
+      vetoMuonRefKeys2.push_back(iVetoMuon2->key());
+    }
+  }
   //fill output collection
   unsigned int nPassingMuons = 0;
   for (std::vector<reco::MuonRef>::const_iterator iMuon = muons.begin(); iMuon != muons.end(); 
        ++iMuon) {
-    if (std::find(vetoMuonRefKeys.begin(), vetoMuonRefKeys.end(), 
-		  iMuon->key()) == vetoMuonRefKeys.end()) {
+    if ((std::find(vetoMuonRefKeys.begin(), vetoMuonRefKeys.end(), 
+		  iMuon->key()) == vetoMuonRefKeys.end())&&(std::find(vetoMuonRefKeys2.begin(), vetoMuonRefKeys2.end(),  iMuon->key()) == vetoMuonRefKeys2.end())) {
       muonColl->push_back(*iMuon);
       ++nPassingMuons;
 

@@ -35,6 +35,8 @@ Implementation:
 #include "Tools/Common/interface/Common.h"
 #include "DataFormats/MuonReco/interface/Muon.h"
 
+#include "FWCore/ServiceRegistry/interface/Service.h"
+#include "CommonTools/UtilAlgos/interface/TFileService.h"
 //
 // class declaration
 //
@@ -89,6 +91,8 @@ private:
 
   //minimum number of gen objects passing cuts that must be found for event to pass filter
   unsigned int minNumGenObjectsToPassFilter_;
+  std::vector<double> EffBins_; 
+    std::map<std::string, TH1D*> histos1D_;
 };
 
 //
@@ -114,7 +118,9 @@ GenMatchedRecoObjectProducer<T>::GenMatchedRecoObjectProducer(const edm::Paramet
   countKShort_(iConfig.getParameter<bool>("countKShort")),
   dR_(iConfig.getParameter<double>("dR")),
   minNumGenObjectsToPassFilter_
-  (iConfig.getParameter<unsigned int>("minNumGenObjectsToPassFilter"))
+  (iConfig.getParameter<unsigned int>("minNumGenObjectsToPassFilter")),
+  EffBins_(iConfig.getParameter<std::vector<double> >("Bins")),
+  histos1D_()
 {
   //register your products
   produces<edm::RefVector<std::vector<T> > >();
@@ -159,10 +165,10 @@ bool GenMatchedRecoObjectProducer<T>::filter(edm::Event& iEvent, const edm::Even
   iEvent.getByToken(baseRecoObjTag_, pBaseRecoObjs);
 
   //fill STL container of pointers to reco objects
-  std::vector<T*> recoObjPtrs;
-  for (typename edm::RefVector<std::vector<T> >::const_iterator iRecoObj = pRecoObjs->begin(); 
-       iRecoObj != pRecoObjs->end(); ++iRecoObj) {
-    recoObjPtrs.push_back(const_cast<T*>(iRecoObj->get()));
+  std::vector<reco::GenParticle*> genObjPtrs;
+  for (typename reco::GenParticleRefVector::const_iterator iGenObj = pSelectedGenParticles->begin(); 
+       iGenObj != pSelectedGenParticles->end(); ++iGenObj) {
+    genObjPtrs.push_back(const_cast<reco::GenParticle*>((*iGenObj).get()));
   }
 
   //fill STL container of selected gen objects
@@ -205,29 +211,17 @@ bool GenMatchedRecoObjectProducer<T>::filter(edm::Event& iEvent, const edm::Even
   // //debug
   std::vector<edm::Ref<std::vector<T> > > recoObjsToSave;
 
-  //loop over selected gen particles
-  for (std::vector<GenTauDecayID>::iterator iGenObj = selectedGenObjs.begin(); 
-       iGenObj != selectedGenObjs.end(); ++iGenObj) {
-
-    //make a dummy LeafCandidate and ref out of the visible 4-vector
-    reco::LeafCandidate::LorentzVector visibleGenP4 = iGenObj->getVisibleTauP4();
-    std::vector<reco::LeafCandidate> 
-      visibleGenParticle(1, reco::LeafCandidate(0.0, visibleGenP4));
-    edm::Ref<std::vector<reco::LeafCandidate> > visibleGenParticleRef(&visibleGenParticle, 0);
-
-    //find the nearest reco object to the gen particle
-    int nearestRecoObjKey = -1;
-    const T* nearestRecoObj = 
-      Common::nearestObject(visibleGenParticleRef, recoObjPtrs, nearestRecoObjKey);
-
-    //if nearest reco object is within dR_ of the gen object, save
-    if ((nearestRecoObj != NULL) && (reco::deltaR(*nearestRecoObj, *visibleGenParticleRef) < dR_)) {
-	genMatchedRecoObjs->
-	  push_back(edm::Ref<std::vector<T> >(pBaseRecoObjs, 
-					      pRecoObjs->at(nearestRecoObjKey).key()));
-    }
+  for(typename edm::RefVector<std::vector<T> >::const_iterator iRecoObj = pRecoObjs->begin();
+       iRecoObj != pRecoObjs->end(); ++iRecoObj) {
+    int nearestGenObjKey=-1;
+    int theRecoKey=(*iRecoObj).key();
+    const reco::GenParticle* nearestGenObj=
+       Common::nearestObject(*iRecoObj,genObjPtrs, nearestGenObjKey ); 
+    if((nearestGenObj!=NULL)&&(reco::deltaR(*nearestGenObj, **iRecoObj)<dR_)){
+      genMatchedRecoObjs->
+         push_back(edm::Ref<std::vector<T>>(pBaseRecoObjs, theRecoKey));
+    } 
   }
-
   //flag indicating whether right number of gen-matched reco objects were found
   bool foundGenMatchedRecoObject = genMatchedRecoObjs->size() >= minNumGenObjectsToPassFilter_;
 
@@ -241,11 +235,21 @@ bool GenMatchedRecoObjectProducer<T>::filter(edm::Event& iEvent, const edm::Even
 template<class T>
 void GenMatchedRecoObjectProducer<T>::beginJob()
 {
+  edm::Service<TFileService> fileService;
+  histos1D_["denominator"]=fileService->make<TH1D>("denominator", "pt of all reco muon after Selection so there should not be muon from Z",  EffBins_.size()-1, &EffBins_[0]);
+  histos1D_[ "denominator" ]->SetXTitle( "pt (GeV)" );
+  histos1D_["numerator"]=fileService->make<TH1D>("numerator","Denominator*Find a nearby muon matched to Z_mu within 0.1 deltaR", EffBins_.size()-1, &EffBins_[0]);
+  histos1D_["numerator"]->SetXTitle("pt (GeV)");
+  histos1D_["Efficiency"]=fileService->make<TH1D>("Efficiency","Efficiency Z mu seed a jet v.s. pt", EffBins_.size()-1, &EffBins_[0]);
+  histos1D_["Efficiency"]->SetXTitle("pt");
+  histos1D_["Efficiency"]->SetYTitle("Efficiency (see title description)");
+  histos1D_["Efficiency"]->Sumw2();
 }
 
 // ------------ method called once each job just after ending the event loop  ------------
 template<class T>
 void GenMatchedRecoObjectProducer<T>::endJob() {
+  histos1D_["Efficiency"]->Divide(histos1D_["numerator"], histos1D_["denominator"]);
 }
 
 // ------------ method called when starting to processes a run  ------------
