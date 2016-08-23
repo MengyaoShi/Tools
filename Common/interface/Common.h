@@ -323,7 +323,33 @@ class Common {
 				      const reco::Vertex* pPV, const bool usePFIso, 
 				      const double PUSubtractionCoeff, const double isoMax, 
 				      const double etaMax, const bool passIso);
-    
+ 
+  static std::vector<reco::MuonRef>
+    getTightDetectorRecoMuons(const edm::Handle<reco::MuonRefVector>&,
+                                  const edm::Handle<reco::MuonCollection>&,
+                                  const reco::Vertex*,
+                                  const double );
+  static std::vector<reco::MuonRef>
+    getTightDetectorRecoMuons(const edm::Handle<reco::MuonCollection>&,
+                      const reco::Vertex*,
+                      const double);  
+  static std::vector<reco::MuonRef>
+    getLooseDetectorRecoMuons(const edm::Handle<reco::MuonRefVector>&,
+                                  const edm::Handle<reco::MuonCollection>&,
+                                  const double );
+  static std::vector<reco::MuonRef>
+    getLooseDetectorRecoMuons(const edm::Handle<reco::MuonCollection>&,
+                      const double);
+  static std::vector<reco::MuonRef>
+    getIsolatedRecoMuons(const edm::Handle<reco::MuonRefVector>&,
+                             const edm::Handle<reco::MuonCollection>&,
+                             const edm::Handle<reco::PFCandidateCollection>&,
+                             const double );
+  static std::vector<reco::MuonRef>
+    getIsolatedRecoMuons(    const edm::Handle<reco::MuonCollection>&,
+                             const edm::Handle<reco::PFCandidateCollection>&,
+                             const double );
+
  private:
 
   static bool compareCandidatePT(reco::Candidate*, reco::Candidate*);

@@ -216,7 +216,9 @@ bool GenMatchedRecoObjectProducer<T>::filter(edm::Event& iEvent, const edm::Even
     int nearestGenObjKey=-1;
     int theRecoKey=(*iRecoObj).key();
     const reco::GenParticle* nearestGenObj=
-       Common::nearestObject(*iRecoObj,genObjPtrs, nearestGenObjKey ); 
+       Common::nearestObject(*iRecoObj,genObjPtrs, nearestGenObjKey );
+   // if(nearestGenObj!=NULL) 
+     //  std::cout<<"Nearest Gen Muon(to third highest pt muon) has mother "<<nearestGenObj->motherRef()->pdgId()<<std::endl;
     if((nearestGenObj!=NULL)&&(reco::deltaR(*nearestGenObj, **iRecoObj)<dR_)){
       genMatchedRecoObjs->
          push_back(edm::Ref<std::vector<T>>(pBaseRecoObjs, theRecoKey));
