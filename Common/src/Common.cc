@@ -297,6 +297,7 @@ Common::getTightDetectorIsolatedRecoMuons(const edm::Handle<reco::MuonRefVector>
 				   passIso);
 }
 
+
 std::vector<reco::MuonRef>
 Common::getSoftRecoMuons(const edm::Handle<reco::MuonCollection>& pMuons, const reco::Vertex* pPV, 
 			 const double etaMax)
@@ -772,6 +773,143 @@ Common::getTightIsolatedRecoMuons(const edm::Handle<reco::MuonRefVector>& pMuons
     }
   }
   return tightMuons;
+}
+
+std::vector<reco::MuonRef>
+Common::getIsolatedRecoMuons(const edm::Handle<reco::MuonCollection>& pMuons,
+			     const edm::Handle<reco::PFCandidateCollection> & pPFCandidates,
+		 	     const double isoMax)
+{
+  reco::Muon HighestPtMu1Mu2;
+  reco::Muon LowestPtMu1Mu2;
+  if((*pMuons)[0].pt()> (*pMuons)[1].pt()){
+    HighestPtMu1Mu2=reco::Muon(((*pMuons)[0]));
+    LowestPtMu1Mu2=reco::Muon(((*pMuons)[1]));
+    }
+  else
+    {
+    HighestPtMu1Mu2=reco::Muon(((*pMuons)[1]));
+    LowestPtMu1Mu2=reco::Muon(((*pMuons)[0]));
+    }
+  double PtSum=0;
+  double Iso=0;
+  std::vector<reco::MuonRef> IsoMuons;
+  for(typename reco::PFCandidateCollection::const_iterator iPFCandidate = pPFCandidates->begin(); iPFCandidate != pPFCandidates->end(); ++iPFCandidate){
+    if(deltaR(HighestPtMu1Mu2, *iPFCandidate )<0.4&&(deltaR(HighestPtMu1Mu2, *iPFCandidate)>0.0001&&((HighestPtMu1Mu2).pt()-(*iPFCandidate).pt())/((HighestPtMu1Mu2).pt())>0.0001)&&(deltaR(LowestPtMu1Mu2, *iPFCandidate)>0.0001&&((LowestPtMu1Mu2).pt()-(*iPFCandidate).pt())/((LowestPtMu1Mu2).pt())>0.0001))
+      PtSum+=(*iPFCandidate).pt();
+    else continue;
+  }
+
+  Iso=PtSum/((HighestPtMu1Mu2).pt());
+  if(Iso<isoMax )
+  {
+    for (reco::MuonCollection::const_iterator iMuon = pMuons->begin(); iMuon != pMuons->end();
+       ++iMuon) {
+    IsoMuons.push_back(reco::MuonRef(pMuons, iMuon - pMuons->begin()));
+    }
+  }
+  return IsoMuons;
+}
+
+std::vector<reco::MuonRef>
+Common::getIsolatedRecoMuons(const edm::Handle<reco::MuonRefVector>& pMuons,
+                             const edm::Handle<reco::MuonCollection>& pBaseMuons,
+                             const edm::Handle<reco::PFCandidateCollection> & pPFCandidates,
+                             const double isoMax)
+{
+  reco::MuonRef HighestPtMu1Mu2;
+  reco::MuonRef LowestPtMu1Mu2;
+  if((*pMuons)[0]->pt()> (*pMuons)[1]->pt()){
+    HighestPtMu1Mu2=reco::MuonRef(((*pMuons)[0]));
+    LowestPtMu1Mu2=reco::MuonRef(((*pMuons)[1]));
+    }
+  else
+    {
+    HighestPtMu1Mu2=reco::MuonRef(((*pMuons)[1]));
+    LowestPtMu1Mu2=reco::MuonRef(((*pMuons)[0]));
+    }
+  double PtSum=0;
+  double Iso=0;
+  std::vector<reco::MuonRef> IsoMuons;
+  for(typename reco::PFCandidateCollection::const_iterator iPFCandidate = pPFCandidates->begin(); iPFCandidate != pPFCandidates->end(); ++iPFCandidate){
+    if(deltaR(*HighestPtMu1Mu2, *iPFCandidate )<0.4&&(deltaR(*HighestPtMu1Mu2, *iPFCandidate)>0.0001&&((*HighestPtMu1Mu2).pt()-(*iPFCandidate).pt())/((*HighestPtMu1Mu2).pt())>0.0001)&&(deltaR(*LowestPtMu1Mu2, *iPFCandidate)>0.0001&&((*LowestPtMu1Mu2).pt()-(*iPFCandidate).pt())/((*LowestPtMu1Mu2).pt())>0.0001))
+      PtSum+=(*iPFCandidate).pt();
+    else continue;
+  }
+Iso=PtSum/((*HighestPtMu1Mu2).pt());
+  if(Iso<isoMax )
+  {
+    for (reco::MuonRefVector::const_iterator iMuon = pMuons->begin(); iMuon != pMuons->end();
+       ++iMuon) {
+    IsoMuons.push_back(reco::MuonRef(pBaseMuons, iMuon->key()));
+    }
+  }
+  return IsoMuons;
+}
+
+std::vector<reco::MuonRef>
+Common::getTightDetectorRecoMuons(const edm::Handle<reco::MuonRefVector>& pMuons,
+                                  const edm::Handle<reco::MuonCollection>& pBaseMuons,
+                                  const reco::Vertex* pPV, 
+                                  const double etaMax )
+{
+  std::vector<reco::MuonRef> tightMuons;
+  for (reco::MuonRefVector::const_iterator iMuon = pMuons->begin(); iMuon != pMuons->end();
+       ++iMuon) {
+    if ((pPV != NULL) &&
+        muon::isTightMuon(**iMuon, *pPV)&& 
+        ((etaMax == -1.0) || (fabs((*iMuon)->eta()) < etaMax))) {
+        tightMuons.push_back(reco::MuonRef(pBaseMuons, iMuon->key()));
+    }
+  }
+  return tightMuons;
+}
+std::vector<reco::MuonRef>
+Common::getTightDetectorRecoMuons(const edm::Handle<reco::MuonCollection>& pMuons,
+                                  const reco::Vertex* pPV, 
+                                  const double etaMax)
+{
+  std::vector<reco::MuonRef> tightMuons;
+  for (reco::MuonCollection::const_iterator iMuon = pMuons->begin(); iMuon != pMuons->end();
+       ++iMuon) {
+    if ((pPV != NULL) &&
+        muon::isTightMuon(*iMuon, *pPV) &&
+        ((etaMax == -1.0) || (fabs(iMuon->eta()) < etaMax))) {
+        tightMuons.push_back(reco::MuonRef(pMuons, iMuon - pMuons->begin()));
+      
+    }
+  }
+  return tightMuons;
+}
+std::vector<reco::MuonRef>
+Common::getLooseDetectorRecoMuons(const edm::Handle<reco::MuonRefVector>& pMuons,
+                                  const edm::Handle<reco::MuonCollection>& pBaseMuons,
+                                  const double etaMax )
+{
+  std::vector<reco::MuonRef> looseMuons;
+  for (reco::MuonRefVector::const_iterator iMuon = pMuons->begin(); iMuon != pMuons->end();
+       ++iMuon) {
+    if (muon::isLooseMuon(**iMuon)&&
+        ((etaMax == -1.0) || (fabs((*iMuon)->eta()) < etaMax))) {
+        looseMuons.push_back(reco::MuonRef(pBaseMuons, iMuon->key()));
+    }
+  }
+  return looseMuons;
+}
+std::vector<reco::MuonRef>
+Common::getLooseDetectorRecoMuons(const edm::Handle<reco::MuonCollection>& pMuons,
+                                  const double etaMax)
+{
+  std::vector<reco::MuonRef> looseMuons;
+  for (reco::MuonCollection::const_iterator iMuon = pMuons->begin(); iMuon != pMuons->end();
+       ++iMuon) {
+    if (muon::isLooseMuon(*iMuon) &&
+        ((etaMax == -1.0) || (fabs(iMuon->eta()) < etaMax))) {
+        looseMuons.push_back(reco::MuonRef(pMuons, iMuon - pMuons->begin()));
+
+    }
+  }
+  return looseMuons;
 }
 
 double Common::rhoCorrIso(const edm::Handle<edm::ValueMap<double> >& pIso, 

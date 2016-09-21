@@ -89,7 +89,7 @@ private:
 
   //|eta| cut
   double etaMax_;
-
+  
   //minimum number of objects that must be found to pass the filter
   unsigned int minNumObjsToPassFilter_;
 };
@@ -174,11 +174,11 @@ bool CustomMuonSelector::filter(edm::Event& iEvent, const edm::EventSetup& iSetu
     https://twiki.cern.ch/twiki/bin/view/CMSPublic/SWGuideMuonId#Muon_Isolation_AN1)*/
   std::vector<reco::MuonRef> muons;
   if (muonID_ == "tight") {
-    if (usePFIso_) {
+    if(usePFIso_) {
       muons = pMuons.isValid() ? 
-	Common::getTightPFIsolatedRecoMuons(pMuons, pBaseMuons, pPV, PUSubtractionCoeff_, 
+      Common::getTightPFIsolatedRecoMuons(pMuons, pBaseMuons, pPV, PUSubtractionCoeff_, 
 					    PFIsoMax_, etaMax_, passIso_) : 
-	Common::getTightPFIsolatedRecoMuons(pBaseMuons, pPV, PUSubtractionCoeff_, PFIsoMax_, 
+      Common::getTightPFIsolatedRecoMuons(pBaseMuons, pPV, PUSubtractionCoeff_, PFIsoMax_, 
 					    etaMax_, passIso_);
     }
 
@@ -187,12 +187,23 @@ bool CustomMuonSelector::filter(edm::Event& iEvent, const edm::EventSetup& iSetu
       https://twiki.cern.ch/twiki/bin/view/CMSPublic/SWGuideMuonId#Muon_Isolation_AN1)*/
     else {
       muons = pMuons.isValid() ? 
-	Common::getTightDetectorIsolatedRecoMuons(pMuons, pBaseMuons, pPV, detectorIsoMax_, 
+      Common::getTightDetectorIsolatedRecoMuons(pMuons, pBaseMuons, pPV, detectorIsoMax_, 
 						  etaMax_, passIso_) : 
-	Common::getTightDetectorIsolatedRecoMuons(pBaseMuons, pPV, detectorIsoMax_, 
+      Common::getTightDetectorIsolatedRecoMuons(pBaseMuons, pPV, detectorIsoMax_, 
 						  etaMax_, passIso_);
     }
   }
+  else if(muonID_== "tightNew"){
+    muons=pMuons.isValid()?
+      Common::getTightDetectorRecoMuons(pMuons, pBaseMuons, pPV, etaMax_):
+      Common::getTightDetectorRecoMuons(pBaseMuons, pPV, etaMax_);
+  }
+  else if(muonID_== "loose"){
+    muons=pMuons.isValid()?
+      Common::getLooseDetectorRecoMuons(pMuons,pBaseMuons, etaMax_):
+      Common::getLooseDetectorRecoMuons(pBaseMuons, etaMax_);
+  }
+  
 
   /*fill STL container of soft muons (cf. 
     https://twiki.cern.ch/twiki/bin/view/CMSPublic/SWGuideMuonId#Soft_Muon)*/
